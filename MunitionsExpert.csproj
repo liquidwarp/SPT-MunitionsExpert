@@ -10,47 +10,63 @@
 
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\Shared\Assembly-CSharp.dll</HintPath>
+      <HintPath>Shared\Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="BepInEx">
-      <HintPath>..\Shared\BepInEx.dll</HintPath>
+      <HintPath>Shared\BepInEx.dll</HintPath>
     </Reference>
     <Reference Include="Comfort">
-      <HintPath>..\Shared\Comfort.dll</HintPath>
+      <HintPath>Shared\Comfort.dll</HintPath>
     </Reference>
     <Reference Include="Sirenix.Serialization">
-      <HintPath>..\Shared\Sirenix.Serialization.dll</HintPath>
+      <HintPath>Shared\Sirenix.Serialization.dll</HintPath>
     </Reference>
     <Reference Include="SPT.Reflection">
-      <HintPath>..\Shared\spt-reflection.dll</HintPath>
+      <HintPath>Shared\spt-reflection.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>..\Shared\UnityEngine.dll</HintPath>
+      <HintPath>Shared\UnityEngine.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>..\Shared\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>Shared\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.ImageConversionModule">
-      <HintPath>..\Shared\UnityEngine.ImageConversionModule.dll</HintPath>
+      <HintPath>Shared\UnityEngine.ImageConversionModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>..\Shared\UnityEngine.UI.dll</HintPath>
+      <HintPath>Shared\UnityEngine.UI.dll</HintPath>
     </Reference>
   </ItemGroup>
 
+  <!-- Icons ship as plain embedded PNGs, read back with GetManifestResourceStream.
+       Logical names are $(RootNamespace).Resources.<file>.png -->
   <ItemGroup>
-    <Compile Update="Properties\Resources.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
+    <EmbeddedResource Include="Resources\*.png" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Update="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
+  <!--
+    Package the plugin as Releases\IcyClawz.MunitionsExpert.zip. The archive root
+    is the BepInEx folder, so it unpacks straight over an SPT install.
 
-</Project>
+    The SPT install is only ever READ from, to resolve the references above.
+    Nothing is written outside this project directory. Staging lives under obj\
+    so it stays gitignored.
+
+    Release-only, so a plain `dotnet build` (which defaults to Debug) stays a
+    quick compile check and can't overwrite a release artifact with a Debug DLL.
+  -->
+  <PropertyGroup>
+    <PackageStagingDir>$(ProjectDir)obj\package\</PackageStagingDir>
+    <ReleaseDir>$(ProjectDir)Releases\</ReleaseDir>
+    <ReleaseZip>$(ReleaseDir)$(AssemblyName).zip</ReleaseZip>
+  </PropertyGroup>
+
+  <Target Name="PackageRelease" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <RemoveDir Directories="$(PackageStagingDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PackageStagingDir)BepInEx\plugins\" />
+    <MakeDir Directories="$(ReleaseDir)" />
+    <ZipDirectory SourceDirectory="$(PackageStagingDir)" DestinationFile="$(ReleaseZip)" Overwrite="true" />
+    <Message Importance="high" Text="Packaged $(ReleaseZip)" />
+  </Target>
+
+</Project>
