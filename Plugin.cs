@@ -13,7 +13,7 @@ using UnityEngine.UI;
 
 namespace IcyClawz.MunitionsExpert;
 
-[BepInPlugin("com.IcyClawz.MunitionsExpert", "IcyClawz.MunitionsExpert", "1.7.0")]
+[BepInPlugin("com.liquidwarp.munitionsexpert", "IcyClawz.MunitionsExpert", "2.0.0")]
 public class Plugin : BaseUnityPlugin
 {
     private static ConfigEntry<bool> ColorizeConfig { get; set; }
