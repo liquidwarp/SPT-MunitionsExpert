@@ -34,6 +34,7 @@ public class Plugin : BaseUnityPlugin
         ];
         new StaticIconsPatch().Enable();
         new AmmoTemplatePatch().Enable();
+        new ThrowWeapPatch().Enable();
         new ItemViewPatch().Enable();
         new EntityIconPatch().Enable();
     }
@@ -74,6 +75,16 @@ internal class AmmoTemplatePatch : ModulePatch
         else
             __instance.AddExtraAttributes();
     }
+}
+
+internal class ThrowWeapPatch : ModulePatch
+{
+    protected override MethodBase GetTargetMethod() =>
+        typeof(ThrowWeap).GetConstructor([typeof(string), typeof(ThrowWeapTemplate)]);
+
+    [PatchPostfix]
+    private static void PatchPostfix(ref ThrowWeap __instance) =>
+        __instance.AddExtraAttributes();
 }
 
 internal class ItemViewPatch : ModulePatch

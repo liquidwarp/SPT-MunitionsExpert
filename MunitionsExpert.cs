@@ -75,6 +75,7 @@ internal static class AmmoTemplateExtensions
             DisplayNameFunc = () => "Armor damage",
             Base = () => instance.ArmorDamage,
             StringValue = () => $"{instance.ArmorDamage}%",
+            Tooltip = () => Explosives.ArmorDamageTooltip,
             DisplayType = () => EItemAttributeDisplayType.Compact,
         });
 
@@ -153,6 +154,54 @@ internal static class AmmoTemplateExtensions
             },
             DisplayType = () => EItemAttributeDisplayType.Compact,
         });
+
+        if (instance.HasGrenaderComponent && instance.MaxExplosionDistance > 0f)
+            instance.AddExplosiveAttributes();
+    }
+
+    private static void AddExplosiveAttributes(this AmmoTemplate instance)
+    {
+        Explosives.SetTooltip(instance._cachedQualities, EItemAttributeId.MaxAmmoDamage,
+            "Direct hit only, the explosion damage is separate.");
+
+        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.MaximumThrowDamage)
+        {
+            Name = "BlastDamage",
+            DisplayNameFunc = () => "Blast damage",
+            Base = () => instance.ExplosionStrength,
+            StringValue = () => instance.ExplosionStrength.ToString(),
+            Tooltip = () => Explosives.BlastDamageTooltip,
+            DisplayType = () => EItemAttributeDisplayType.Compact,
+        });
+
+        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.ExplosionDistance)
+        {
+            Name = EItemAttributeId.ExplosionDistance.GetName(),
+            Base = () => instance.MaxExplosionDistance,
+            StringValue = () => $"{instance.MinExplosionDistance} - {instance.MaxExplosionDistance} {"meters".Localized()}",
+            DisplayType = () => EItemAttributeDisplayType.Compact,
+        });
+
+        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.ExplosionDelay)
+        {
+            Name = "FuzeArmTime",
+            DisplayNameFunc = () => "Fuse arming",
+            Base = () => instance.FuzeArmTimeSec,
+            StringValue = () => $"{instance.FuzeArmTimeSec}s (~{instance.FuzeArmTimeSec * instance.InitialSpeed:F0}m)",
+            DisplayType = () => EItemAttributeDisplayType.Compact,
+        });
+
+        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.FragmentsCount)
+        {
+            Name = EItemAttributeId.FragmentsCount.GetName(),
+            Base = () => instance.FragmentsCount,
+            StringValue = () => Explosives.FormatFragmentsCount(instance.FragmentsCount),
+            Tooltip = () => Explosives.FragmentsCountTooltip,
+            DisplayType = () => EItemAttributeDisplayType.Compact,
+        });
+
+        foreach (ItemAttribute attribute in Explosives.CreateFragmentAttributes(instance.FragmentsCount, instance.FragmentType))
+            instance.SafelyAddQualityToList(attribute);
     }
 
     public static int GetPenetrationArmorClass(this AmmoTemplate instance)
@@ -162,5 +211,76 @@ internal static class AmmoTemplateExtensions
             if (armorClasses[i].Resistance <= instance.PenetrationPower)
                 return i;
         return 0;
+    }
+}
+
+internal static class ThrowWeapExtensions
+{
+    public static void AddExtraAttributes(this ThrowWeap instance)
+    {
+        Explosives.SetTooltip(instance.Attributes, EItemAttributeId.MaximumThrowDamage, Explosives.BlastDamageTooltip);
+        Explosives.SetTooltip(instance.Attributes, EItemAttributeId.FragmentsCount, Explosives.FragmentsCountTooltip);
+        foreach (ItemAttribute attribute in instance.Attributes)
+            if (Equals(attribute.Id, EItemAttributeId.FragmentsCount))
+                attribute.StringValue = () => Explosives.FormatFragmentsCount(instance.FragmentsCount);
+
+        foreach (ItemAttribute attribute in Explosives.CreateFragmentAttributes(instance.FragmentsCount, instance.FragmentType))
+            instance.SafelyAddAttributeToList(attribute);
+    }
+}
+
+internal static class Explosives
+{
+    public const string BlastDamageTooltip = "Per exposed body part within the inner blast radius. Falls off with distance and cover.";
+    public const string ArmorDamageTooltip = "Indicative value, actual durability loss also depends on penetration, armor class and material.";
+    public const string FragmentsCountTooltip = "Indicative value, the game fires at most 30 fragments per explosion.";
+
+    // The game caps fragments fired per explosion at 30, whatever the template lists.
+    private const int MaxFiredFragments = 30;
+
+    public static string FormatFragmentsCount(int count) =>
+        count > MaxFiredFragments ? $"{MaxFiredFragments} ({count})" : count.ToString();
+
+    public static IEnumerable<ItemAttribute> CreateFragmentAttributes(int fragmentsCount, string fragmentType)
+    {
+        if (fragmentsCount <= 0 || string.IsNullOrEmpty(fragmentType)
+            || !Singleton<ItemFactory>.Instance.ItemTemplates.TryGetValue(fragmentType, out ItemTemplate template)
+            || template is not AmmoTemplate fragment)
+            yield break;
+
+        yield return new ItemAttribute(EItemAttributeId.MaxAmmoDamage)
+        {
+            Name = "FragmentDamage",
+            DisplayNameFunc = () => "Fragment damage",
+            Base = () => fragment.Damage,
+            StringValue = () => fragment.Damage.ToString(),
+            DisplayType = () => EItemAttributeDisplayType.Compact,
+        };
+
+        yield return new ItemAttribute(EItemAttributeId.AmmoPenetrationPower)
+        {
+            Name = "FragmentPenetrationPower",
+            DisplayNameFunc = () => "Fragment penetration",
+            Base = () => fragment.PenetrationPower,
+            StringValue = () => fragment.PenetrationPower.ToString(),
+            DisplayType = () => EItemAttributeDisplayType.Compact,
+        };
+
+        yield return new ItemAttribute(EAmmoExtraAttributeId.ArmorDamage)
+        {
+            Name = "FragmentArmorDamage",
+            DisplayNameFunc = () => "Fragment armor damage",
+            Base = () => fragment.ArmorDamage,
+            StringValue = () => $"{fragment.ArmorDamage}%",
+            Tooltip = () => ArmorDamageTooltip,
+            DisplayType = () => EItemAttributeDisplayType.Compact,
+        };
+    }
+
+    public static void SetTooltip(IEnumerable<ItemAttribute> attributes, EItemAttributeId id, string tooltip)
+    {
+        foreach (ItemAttribute attribute in attributes)
+            if (Equals(attribute.Id, id))
+                attribute.Tooltip = () => tooltip;
     }
 }
