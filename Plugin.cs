@@ -54,8 +54,15 @@ internal class StaticIconsPatch : ModulePatch
         typeof(StaticIcons).GetMethod("GetAttributeIcon", BindingFlags.Public | BindingFlags.Instance);
 
     [PatchPrefix]
-    private static bool PatchPrefix(ref Sprite __result, Enum id) =>
-        (__result = IconCache.Get(id)) is null;
+    private static bool PatchPrefix(Enum id) =>
+        IconCache.Get(id) is null;
+
+    [PatchPostfix]
+    private static void PatchPostfix(ref Sprite __result, Enum id)
+    {
+        if (IconCache.Get(id) is Sprite sprite)
+            __result = sprite;
+    }
 }
 
 internal class AmmoTemplatePatch : ModulePatch
