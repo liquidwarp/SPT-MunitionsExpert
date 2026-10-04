@@ -104,6 +104,7 @@ internal static class AmmoTemplateExtensions
             DisplayNameFunc = () => "Fragmentation chance",
             Base = () => instance.FragmentationChance,
             StringValue = () => $"{instance.FragmentationChance * 100f:F1}%",
+            Tooltip = () => "Indicative value, actual chance depends on the penetrated surface.",
             DisplayType = () => EItemAttributeDisplayType.Compact,
         });
 
@@ -113,6 +114,7 @@ internal static class AmmoTemplateExtensions
             DisplayNameFunc = () => "Ricochet chance",
             Base = () => instance.RicochetChance,
             StringValue = () => $"{(instance.RicochetChance * 100f):F1}%",
+            Tooltip = () => "World surfaces only, no effect on armor. Indicative value, actual chance depends on surface and impact angle.",
             DisplayType = () => EItemAttributeDisplayType.Compact,
         });
 
