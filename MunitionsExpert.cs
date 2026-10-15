@@ -73,31 +73,33 @@ internal static class AmmoTemplateExtensions
             displayName: () => "Armor damage",
             tooltip: () => ArmorDamageTooltip));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.DurabilityBurn,
-            EItemAttributeId.DurabilityBurn.GetName(),
-            () => instance.DurabilityBurnModificator - 1f,
-            () => $"{(instance.DurabilityBurnModificator - 1f) * 100f:F1}%",
-            labelVariations: EItemAttributeLabelVariations.Colored,
-            lessIsGood: true));
+        if (instance.DurabilityBurnModificator > 0f)
+            instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.DurabilityBurn,
+                EItemAttributeId.DurabilityBurn.GetName(),
+                () => instance.DurabilityBurnModificator - 1f,
+                () => $"{(instance.DurabilityBurnModificator - 1f) * 100f:F1}%",
+                labelVariations: EItemAttributeLabelVariations.Colored,
+                lessIsGood: true));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.HeatFactor,
-            EItemAttributeId.HeatFactor.GetName(),
-            () => instance.HeatFactor - 1f,
-            () => $"{(instance.HeatFactor - 1f) * 100f:F1}%",
-            labelVariations: EItemAttributeLabelVariations.Colored,
-            lessIsGood: true));
+        if (instance.HeatFactor > 0f)
+            instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.HeatFactor,
+                EItemAttributeId.HeatFactor.GetName(),
+                () => instance.HeatFactor - 1f,
+                () => $"{(instance.HeatFactor - 1f) * 100f:F1}%",
+                labelVariations: EItemAttributeLabelVariations.Colored,
+                lessIsGood: true));
 
         instance.SafelyAddQualityToList(CompactAttribute.Create(EAmmoExtraAttributeId.FragmentationChance,
             nameof(EAmmoExtraAttributeId.FragmentationChance),
             () => instance.FragmentationChance,
-            () => $"{instance.FragmentationChance * 100f:F1}%",
+            () => Percent(instance.FragmentationChance),
             displayName: () => "Fragmentation chance",
             tooltip: () => "Indicative value, actual chance depends on the penetrated surface."));
 
         instance.SafelyAddQualityToList(CompactAttribute.Create(EAmmoExtraAttributeId.RicochetChance,
             nameof(EAmmoExtraAttributeId.RicochetChance),
             () => instance.RicochetChance,
-            () => $"{instance.RicochetChance * 100f:F1}%",
+            () => Percent(instance.RicochetChance),
             displayName: () => "Ricochet chance",
             tooltip: () => "World surfaces only, no effect on armor. Indicative value, actual chance depends on surface and impact angle."));
 
@@ -114,6 +116,8 @@ internal static class AmmoTemplateExtensions
         if (instance.HasGrenaderComponent && instance.MaxExplosionDistance > 0f)
             instance.AddExplosiveAttributes();
     }
+
+    private static string Percent(float chance) => $"{Mathf.Clamp01(chance) * 100f:F1}%";
 
     private static string MalfChance(float chance, float max, float bound1, float bound2, float bound3, float bound4)
     {
@@ -143,11 +147,12 @@ internal static class AmmoTemplateExtensions
             () => instance.MaxExplosionDistance,
             () => $"{instance.MinExplosionDistance} - {instance.MaxExplosionDistance} {"meters".Localized()}"));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.ExplosionDelay,
-            "FuzeArmTime",
-            () => instance.FuzeArmTimeSec,
-            () => $"{instance.FuzeArmTimeSec}s (~{instance.FuzeArmTimeSec * instance.InitialSpeed:F0}m)",
-            displayName: () => "Fuse arming"));
+        if (instance.FuzeArmTimeSec > 0f)
+            instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.ExplosionDelay,
+                "FuzeArmTime",
+                () => instance.FuzeArmTimeSec,
+                () => $"{instance.FuzeArmTimeSec}s (~{instance.FuzeArmTimeSec * instance.InitialSpeed:F0}m)",
+                displayName: () => "Fuse arming"));
 
         instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.FragmentsCount,
             EItemAttributeId.FragmentsCount.GetName(),
