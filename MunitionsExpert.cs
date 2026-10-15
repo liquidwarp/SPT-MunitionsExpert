@@ -6,36 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace IcyClawz.MunitionsExpert;
-
-internal enum ColorName
-{
-    Blue, Brown, Cyan, Gray, Green, Magenta, Orange, Pink, Purple, Red, Silver, Tan, Violet, Yellow
-}
-
-internal static class ColorCache
-{
-    private const byte ALPHA = 38;
-    private static readonly Dictionary<ColorName, Color> Cache = new()
-    {
-        [ColorName.Blue] = new Color32(0, 60, 170, ALPHA),
-        [ColorName.Brown] = new Color32(140, 85, 30, ALPHA),
-        [ColorName.Cyan] = new Color32(0, 150, 150, ALPHA),
-        [ColorName.Gray] = new Color32(70, 70, 70, ALPHA),
-        [ColorName.Green] = new Color32(70, 140, 0, ALPHA),
-        [ColorName.Magenta] = new Color32(215, 0, 100, ALPHA),
-        [ColorName.Orange] = new Color32(140, 70, 0, ALPHA),
-        [ColorName.Pink] = new Color32(215, 120, 150, ALPHA),
-        [ColorName.Purple] = new Color32(120, 40, 135, ALPHA),
-        [ColorName.Red] = new Color32(170, 20, 0, ALPHA),
-        [ColorName.Silver] = new Color32(150, 150, 150, ALPHA),
-        [ColorName.Tan] = new Color32(175, 145, 100, ALPHA),
-        [ColorName.Violet] = new Color32(80, 50, 180, ALPHA),
-        [ColorName.Yellow] = new Color32(170, 170, 0, ALPHA),
-    };
-
-    public static Color Get(ColorName name) => Cache.TryGetValue(name, out Color color) ? color : default;
-}
+namespace Liquidwarp.MunitionsExpert;
 
 internal enum EAmmoExtraAttributeId
 {
@@ -44,173 +15,148 @@ internal enum EAmmoExtraAttributeId
 
 internal static class IconCache
 {
-    private static readonly Dictionary<Enum, Sprite> Cache = new()
-    {
-        [EAmmoExtraAttributeId.ArmorDamage] = Load(nameof(EAmmoExtraAttributeId.ArmorDamage)),
-        [EAmmoExtraAttributeId.FragmentationChance] = Load(nameof(EAmmoExtraAttributeId.FragmentationChance)),
-        [EAmmoExtraAttributeId.RicochetChance] = Load(nameof(EAmmoExtraAttributeId.RicochetChance)),
-    };
+    private static readonly Dictionary<Enum, Sprite> Cache = LoadAll();
 
-    public static Sprite Get(Enum id) => Cache.TryGetValue(id, out Sprite sprite) ? sprite : default;
+    public static Sprite Get(Enum id) => Cache.TryGetValue(id, out Sprite sprite) ? sprite : null;
+
+    private static Dictionary<Enum, Sprite> LoadAll()
+    {
+        var cache = new Dictionary<Enum, Sprite>();
+        foreach (EAmmoExtraAttributeId id in Enum.GetValues(typeof(EAmmoExtraAttributeId)))
+            cache[id] = Load(id.ToString());
+        return cache;
+    }
 
     private static Sprite Load(string name)
     {
-        using Stream stream = typeof(IconCache).Assembly
-            .GetManifestResourceStream($"IcyClawz.MunitionsExpert.Resources.{name}.png");
+        using Stream stream = typeof(IconCache).Assembly.GetManifestResourceStream($"{name}.png");
         byte[] bytes = new byte[stream.Length];
         stream.Read(bytes, 0, bytes.Length);
         Texture2D texture = new(2, 2, TextureFormat.RGBA32, false);
-        texture.LoadImage(bytes); // resizes the texture to the PNG's own dimensions
+        texture.LoadImage(bytes);
         return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.zero);
+    }
+}
+
+internal static class CompactAttribute
+{
+    public static ItemAttribute Create(Enum id, string name, Func<float> @base, Func<string> value,
+        Func<string> displayName = null, Func<string> tooltip = null,
+        EItemAttributeLabelVariations labelVariations = default, bool lessIsGood = false)
+    {
+        var attribute = new ItemAttribute(id)
+        {
+            Name = name,
+            DisplayNameFunc = displayName,
+            Base = @base,
+            StringValue = value,
+            DisplayType = () => EItemAttributeDisplayType.Compact,
+            LabelVariations = labelVariations,
+            LessIsGood = lessIsGood,
+        };
+        if (tooltip != null)
+            attribute.Tooltip = tooltip;
+        return attribute;
     }
 }
 
 internal static class AmmoTemplateExtensions
 {
+    public const string ArmorDamageTooltip = "Indicative value, actual durability loss also depends on penetration, armor class and material.";
+
     public static void AddExtraAttributes(this AmmoTemplate instance)
     {
-        instance.SafelyAddQualityToList(new ItemAttribute(EAmmoExtraAttributeId.ArmorDamage)
-        {
-            Name = EAmmoExtraAttributeId.ArmorDamage.ToString(),
-            DisplayNameFunc = () => "Armor damage",
-            Base = () => instance.ArmorDamage,
-            StringValue = () => $"{instance.ArmorDamage}%",
-            Tooltip = () => Explosives.ArmorDamageTooltip,
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EAmmoExtraAttributeId.ArmorDamage,
+            nameof(EAmmoExtraAttributeId.ArmorDamage),
+            () => instance.ArmorDamage,
+            () => $"{instance.ArmorDamage}%",
+            displayName: () => "Armor damage",
+            tooltip: () => ArmorDamageTooltip));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.DurabilityBurn)
-        {
-            Name = EItemAttributeId.DurabilityBurn.GetName(),
-            Base = () => instance.DurabilityBurnModificator - 1f,
-            StringValue = () => $"{(instance.DurabilityBurnModificator - 1f) * 100f:F1}%",
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-            LabelVariations = EItemAttributeLabelVariations.Colored,
-            LessIsGood = true,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.DurabilityBurn,
+            EItemAttributeId.DurabilityBurn.GetName(),
+            () => instance.DurabilityBurnModificator - 1f,
+            () => $"{(instance.DurabilityBurnModificator - 1f) * 100f:F1}%",
+            labelVariations: EItemAttributeLabelVariations.Colored,
+            lessIsGood: true));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.HeatFactor)
-        {
-            Name = EItemAttributeId.HeatFactor.GetName(),
-            Base = () => instance.HeatFactor - 1f,
-            StringValue = () => $"{(instance.HeatFactor - 1f) * 100f:F1}%",
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-            LabelVariations = EItemAttributeLabelVariations.Colored,
-            LessIsGood = true,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.HeatFactor,
+            EItemAttributeId.HeatFactor.GetName(),
+            () => instance.HeatFactor - 1f,
+            () => $"{(instance.HeatFactor - 1f) * 100f:F1}%",
+            labelVariations: EItemAttributeLabelVariations.Colored,
+            lessIsGood: true));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EAmmoExtraAttributeId.FragmentationChance)
-        {
-            Name = EAmmoExtraAttributeId.FragmentationChance.ToString(),
-            DisplayNameFunc = () => "Fragmentation chance",
-            Base = () => instance.FragmentationChance,
-            StringValue = () => $"{instance.FragmentationChance * 100f:F1}%",
-            Tooltip = () => "Indicative value, actual chance depends on the penetrated surface.",
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EAmmoExtraAttributeId.FragmentationChance,
+            nameof(EAmmoExtraAttributeId.FragmentationChance),
+            () => instance.FragmentationChance,
+            () => $"{instance.FragmentationChance * 100f:F1}%",
+            displayName: () => "Fragmentation chance",
+            tooltip: () => "Indicative value, actual chance depends on the penetrated surface."));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EAmmoExtraAttributeId.RicochetChance)
-        {
-            Name = EAmmoExtraAttributeId.RicochetChance.ToString(),
-            DisplayNameFunc = () => "Ricochet chance",
-            Base = () => instance.RicochetChance,
-            StringValue = () => $"{(instance.RicochetChance * 100f):F1}%",
-            Tooltip = () => "World surfaces only, no effect on armor. Indicative value, actual chance depends on surface and impact angle.",
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EAmmoExtraAttributeId.RicochetChance,
+            nameof(EAmmoExtraAttributeId.RicochetChance),
+            () => instance.RicochetChance,
+            () => $"{instance.RicochetChance * 100f:F1}%",
+            displayName: () => "Ricochet chance",
+            tooltip: () => "World surfaces only, no effect on armor. Indicative value, actual chance depends on surface and impact angle."));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.MalfMisfireChance)
-        {
-            Name = EItemAttributeId.MalfMisfireChance.GetName(),
-            Base = () => instance.MalfMisfireChance,
-            StringValue = () =>
-            {
-                float maxMalfMisfireChance = AmmoTemplate.MaxMalfMisfireChance;
-                int index = instance.MalfMisfireChance <= 0f ? 0
-                    : instance.MalfMisfireChance < 3f * maxMalfMisfireChance / 7f ? 1
-                    : instance.MalfMisfireChance < 4f * maxMalfMisfireChance / 7f ? 2
-                    : instance.MalfMisfireChance < 5f * maxMalfMisfireChance / 7f ? 3
-                    : instance.MalfMisfireChance < 6f * maxMalfMisfireChance / 7f ? 4
-                    : 5;
-                return AmmoTemplate.MalfChancesKeys[index].Localized();
-            },
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.MalfMisfireChance,
+            EItemAttributeId.MalfMisfireChance.GetName(),
+            () => instance.MalfMisfireChance,
+            () => MalfChance(instance.MalfMisfireChance, AmmoTemplate.MaxMalfMisfireChance, 3f, 4f, 5f, 6f)));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.MalfFeedChance)
-        {
-            Name = EItemAttributeId.MalfFeedChance.GetName(),
-            Base = () => instance.MalfFeedChance,
-            StringValue = () =>
-            {
-                float maxMalfFeedChance = AmmoTemplate.MaxMalfFeedChance;
-                int index = instance.MalfFeedChance <= 0f ? 0
-                    : instance.MalfFeedChance < 1f * maxMalfFeedChance / 7f ? 1
-                    : instance.MalfFeedChance < 3f * maxMalfFeedChance / 7f ? 2
-                    : instance.MalfFeedChance < 5f * maxMalfFeedChance / 7f ? 3
-                    : instance.MalfFeedChance < 6f * maxMalfFeedChance / 7f ? 4
-                    : 5;
-                return AmmoTemplate.MalfChancesKeys[index].Localized();
-            },
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.MalfFeedChance,
+            EItemAttributeId.MalfFeedChance.GetName(),
+            () => instance.MalfFeedChance,
+            () => MalfChance(instance.MalfFeedChance, AmmoTemplate.MaxMalfFeedChance, 1f, 3f, 5f, 6f)));
 
         if (instance.HasGrenaderComponent && instance.MaxExplosionDistance > 0f)
             instance.AddExplosiveAttributes();
     }
 
+    private static string MalfChance(float chance, float max, float bound1, float bound2, float bound3, float bound4)
+    {
+        int index = chance <= 0f ? 0
+            : chance < bound1 * max / 7f ? 1
+            : chance < bound2 * max / 7f ? 2
+            : chance < bound3 * max / 7f ? 3
+            : chance < bound4 * max / 7f ? 4
+            : 5;
+        return AmmoTemplate.MalfChancesKeys[index].Localized();
+    }
+
     private static void AddExplosiveAttributes(this AmmoTemplate instance)
     {
         Explosives.SetTooltip(instance._cachedQualities, EItemAttributeId.MaxAmmoDamage,
-            "Direct hit only, the explosion damage is separate.");
+            () => "Direct hit only, the explosion damage is separate.");
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.MaximumThrowDamage)
-        {
-            Name = "BlastDamage",
-            DisplayNameFunc = () => "Blast damage",
-            Base = () => instance.ExplosionStrength,
-            StringValue = () => instance.ExplosionStrength.ToString(),
-            Tooltip = () => Explosives.BlastDamageTooltip,
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.MaximumThrowDamage,
+            "BlastDamage",
+            () => instance.ExplosionStrength,
+            () => instance.ExplosionStrength.ToString(),
+            displayName: () => "Blast damage",
+            tooltip: () => Explosives.BlastDamageTooltip));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.ExplosionDistance)
-        {
-            Name = EItemAttributeId.ExplosionDistance.GetName(),
-            Base = () => instance.MaxExplosionDistance,
-            StringValue = () => $"{instance.MinExplosionDistance} - {instance.MaxExplosionDistance} {"meters".Localized()}",
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.ExplosionDistance,
+            EItemAttributeId.ExplosionDistance.GetName(),
+            () => instance.MaxExplosionDistance,
+            () => $"{instance.MinExplosionDistance} - {instance.MaxExplosionDistance} {"meters".Localized()}"));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.ExplosionDelay)
-        {
-            Name = "FuzeArmTime",
-            DisplayNameFunc = () => "Fuse arming",
-            Base = () => instance.FuzeArmTimeSec,
-            StringValue = () => $"{instance.FuzeArmTimeSec}s (~{instance.FuzeArmTimeSec * instance.InitialSpeed:F0}m)",
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.ExplosionDelay,
+            "FuzeArmTime",
+            () => instance.FuzeArmTimeSec,
+            () => $"{instance.FuzeArmTimeSec}s (~{instance.FuzeArmTimeSec * instance.InitialSpeed:F0}m)",
+            displayName: () => "Fuse arming"));
 
-        instance.SafelyAddQualityToList(new ItemAttribute(EItemAttributeId.FragmentsCount)
-        {
-            Name = EItemAttributeId.FragmentsCount.GetName(),
-            Base = () => instance.FragmentsCount,
-            StringValue = () => Explosives.FormatFragmentsCount(instance.FragmentsCount),
-            Tooltip = () => Explosives.FragmentsCountTooltip,
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        });
+        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.FragmentsCount,
+            EItemAttributeId.FragmentsCount.GetName(),
+            () => instance.FragmentsCount,
+            () => Explosives.FormatFragmentsCount(instance.FragmentsCount),
+            tooltip: () => Explosives.FragmentsCountTooltip));
 
         foreach (ItemAttribute attribute in Explosives.CreateFragmentAttributes(instance.FragmentsCount, instance.FragmentType))
             instance.SafelyAddQualityToList(attribute);
-    }
-
-    public static int GetPenetrationArmorClass(this AmmoTemplate instance)
-    {
-        var armorClasses = Singleton<GlobalConfiguration>.Instance.Armor.ArmorClass;
-        for (int i = armorClasses.Length - 1; i >= 0; i--)
-            if (armorClasses[i].Resistance <= instance.PenetrationPower)
-                return i;
-        return 0;
     }
 }
 
@@ -218,11 +164,20 @@ internal static class ThrowWeapExtensions
 {
     public static void AddExtraAttributes(this ThrowWeap instance)
     {
-        Explosives.SetTooltip(instance.Attributes, EItemAttributeId.MaximumThrowDamage, Explosives.BlastDamageTooltip);
-        Explosives.SetTooltip(instance.Attributes, EItemAttributeId.FragmentsCount, Explosives.FragmentsCountTooltip);
         foreach (ItemAttribute attribute in instance.Attributes)
-            if (Equals(attribute.Id, EItemAttributeId.FragmentsCount))
+        {
+            if (attribute.Id is not EItemAttributeId id)
+                continue;
+            if (id == EItemAttributeId.MaximumThrowDamage)
+            {
+                attribute.Tooltip = () => Explosives.BlastDamageTooltip;
+            }
+            else if (id == EItemAttributeId.FragmentsCount)
+            {
                 attribute.StringValue = () => Explosives.FormatFragmentsCount(instance.FragmentsCount);
+                attribute.Tooltip = () => Explosives.FragmentsCountTooltip;
+            }
+        }
 
         foreach (ItemAttribute attribute in Explosives.CreateFragmentAttributes(instance.FragmentsCount, instance.FragmentType))
             instance.SafelyAddAttributeToList(attribute);
@@ -232,7 +187,6 @@ internal static class ThrowWeapExtensions
 internal static class Explosives
 {
     public const string BlastDamageTooltip = "Per exposed body part within the inner blast radius. Falls off with distance and cover.";
-    public const string ArmorDamageTooltip = "Indicative value, actual durability loss also depends on penetration, armor class and material.";
     public const string FragmentsCountTooltip = "Indicative value, the game fires at most 30 fragments per explosion.";
 
     // The game caps fragments fired per explosion at 30, whatever the template lists.
@@ -248,39 +202,27 @@ internal static class Explosives
             || template is not AmmoTemplate fragment)
             yield break;
 
-        yield return new ItemAttribute(EItemAttributeId.MaxAmmoDamage)
-        {
-            Name = "FragmentDamage",
-            DisplayNameFunc = () => "Fragment damage",
-            Base = () => fragment.Damage,
-            StringValue = () => fragment.Damage.ToString(),
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        };
+        yield return CompactAttribute.Create(EItemAttributeId.MaxAmmoDamage, "FragmentDamage",
+            () => fragment.Damage,
+            () => fragment.Damage.ToString(),
+            displayName: () => "Fragment damage");
 
-        yield return new ItemAttribute(EItemAttributeId.AmmoPenetrationPower)
-        {
-            Name = "FragmentPenetrationPower",
-            DisplayNameFunc = () => "Fragment penetration",
-            Base = () => fragment.PenetrationPower,
-            StringValue = () => fragment.PenetrationPower.ToString(),
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        };
+        yield return CompactAttribute.Create(EItemAttributeId.AmmoPenetrationPower, "FragmentPenetrationPower",
+            () => fragment.PenetrationPower,
+            () => fragment.PenetrationPower.ToString(),
+            displayName: () => "Fragment penetration");
 
-        yield return new ItemAttribute(EAmmoExtraAttributeId.ArmorDamage)
-        {
-            Name = "FragmentArmorDamage",
-            DisplayNameFunc = () => "Fragment armor damage",
-            Base = () => fragment.ArmorDamage,
-            StringValue = () => $"{fragment.ArmorDamage}%",
-            Tooltip = () => ArmorDamageTooltip,
-            DisplayType = () => EItemAttributeDisplayType.Compact,
-        };
+        yield return CompactAttribute.Create(EAmmoExtraAttributeId.ArmorDamage, "FragmentArmorDamage",
+            () => fragment.ArmorDamage,
+            () => $"{fragment.ArmorDamage}%",
+            displayName: () => "Fragment armor damage",
+            tooltip: () => AmmoTemplateExtensions.ArmorDamageTooltip);
     }
 
-    public static void SetTooltip(IEnumerable<ItemAttribute> attributes, EItemAttributeId id, string tooltip)
+    public static void SetTooltip(List<ItemAttribute> attributes, EItemAttributeId id, Func<string> tooltip)
     {
         foreach (ItemAttribute attribute in attributes)
-            if (Equals(attribute.Id, id))
-                attribute.Tooltip = () => tooltip;
+            if (attribute.Id is EItemAttributeId attributeId && attributeId == id)
+                attribute.Tooltip = tooltip;
     }
 }
