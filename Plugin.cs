@@ -8,8 +8,11 @@ public class Plugin : BaseUnityPlugin
 {
     private void Awake()
     {
+        Settings.Init(Config);
         new StaticIconsPatch().Enable();
         new AmmoTemplatePatch().Enable();
         new ThrowWeapPatch().Enable();
+        new ItemViewPatch().Enable();
+        new EntityIconPatch().Enable();
     }
 }

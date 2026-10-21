@@ -1,3 +1,4 @@
+using BepInEx.Configuration;
 using Comfort.Common;
 using EFT;
 using EFT.InventoryLogic;
@@ -38,6 +39,18 @@ internal static class IconCache
     }
 }
 
+internal static class AmmoBackgroundColor
+{
+    public static bool TryGet(Item item, out Color color)
+    {
+        color = default;
+        if (!Settings.ColorizeBackgrounds.Value || item is not Ammo ammo || ammo.PenetrationPower <= 0)
+            return false;
+        color = Settings.GetArmorClassColor(ammo.AmmoTemplate.GetPenetrationArmorClass());
+        return true;
+    }
+}
+
 internal static class CompactAttribute
 {
     public static ItemAttribute Create(Enum id, string name, Func<float> @base, Func<string> value,
@@ -66,7 +79,7 @@ internal static class AmmoTemplateExtensions
 
     public static void AddExtraAttributes(this AmmoTemplate instance)
     {
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EAmmoExtraAttributeId.ArmorDamage,
+        instance.AddExtraQuality(Settings.ArmorDamage, CompactAttribute.Create(EAmmoExtraAttributeId.ArmorDamage,
             nameof(EAmmoExtraAttributeId.ArmorDamage),
             () => instance.ArmorDamage,
             () => $"{instance.ArmorDamage}%",
@@ -74,7 +87,7 @@ internal static class AmmoTemplateExtensions
             tooltip: () => ArmorDamageTooltip));
 
         if (instance.DurabilityBurnModificator > 0f)
-            instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.DurabilityBurn,
+            instance.AddExtraQuality(Settings.DurabilityBurn, CompactAttribute.Create(EItemAttributeId.DurabilityBurn,
                 EItemAttributeId.DurabilityBurn.GetName(),
                 () => instance.DurabilityBurnModificator - 1f,
                 () => $"{(instance.DurabilityBurnModificator - 1f) * 100f:F1}%",
@@ -82,39 +95,73 @@ internal static class AmmoTemplateExtensions
                 lessIsGood: true));
 
         if (instance.HeatFactor > 0f)
-            instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.HeatFactor,
+            instance.AddExtraQuality(Settings.HeatFactor, CompactAttribute.Create(EItemAttributeId.HeatFactor,
                 EItemAttributeId.HeatFactor.GetName(),
                 () => instance.HeatFactor - 1f,
                 () => $"{(instance.HeatFactor - 1f) * 100f:F1}%",
                 labelVariations: EItemAttributeLabelVariations.Colored,
                 lessIsGood: true));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EAmmoExtraAttributeId.FragmentationChance,
+        instance.AddExtraQuality(Settings.FragmentationChance, CompactAttribute.Create(EAmmoExtraAttributeId.FragmentationChance,
             nameof(EAmmoExtraAttributeId.FragmentationChance),
             () => instance.FragmentationChance,
             () => Percent(instance.FragmentationChance),
             displayName: () => "Fragmentation chance",
             tooltip: () => "Indicative value, actual chance depends on the penetrated surface."));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EAmmoExtraAttributeId.RicochetChance,
+        instance.AddExtraQuality(Settings.RicochetChance, CompactAttribute.Create(EAmmoExtraAttributeId.RicochetChance,
             nameof(EAmmoExtraAttributeId.RicochetChance),
             () => instance.RicochetChance,
             () => Percent(instance.RicochetChance),
             displayName: () => "Ricochet chance",
             tooltip: () => "World surfaces only, no effect on armor. Indicative value, actual chance depends on surface and impact angle."));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.MalfMisfireChance,
+        instance.AddExtraQuality(Settings.MisfireChance, CompactAttribute.Create(EItemAttributeId.MalfMisfireChance,
             EItemAttributeId.MalfMisfireChance.GetName(),
             () => instance.MalfMisfireChance,
             () => MalfChance(instance.MalfMisfireChance, AmmoTemplate.MaxMalfMisfireChance, 3f, 4f, 5f, 6f)));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.MalfFeedChance,
+        instance.AddExtraQuality(Settings.FeedFailureChance, CompactAttribute.Create(EItemAttributeId.MalfFeedChance,
             EItemAttributeId.MalfFeedChance.GetName(),
             () => instance.MalfFeedChance,
             () => MalfChance(instance.MalfFeedChance, AmmoTemplate.MaxMalfFeedChance, 1f, 3f, 5f, 6f)));
 
         if (instance.HasGrenaderComponent && instance.MaxExplosionDistance > 0f)
             instance.AddExplosiveAttributes();
+    }
+
+    public static void RefreshAllExtraAttributes()
+    {
+        if (!Singleton<ItemFactory>.Instantiated)
+            return;
+        foreach (ItemTemplate template in Singleton<ItemFactory>.Instance.ItemTemplates.Values)
+        {
+            if (template is not AmmoTemplate { _cachedQualities: not null } ammo)
+                continue;
+            ammo._cachedQualities.RemoveAll(ExtraAttributes.Remove);
+            ammo.AddExtraAttributes();
+        }
+    }
+
+    public static int GetPenetrationArmorClass(this AmmoTemplate instance)
+    {
+        var armorClasses = Singleton<GlobalConfiguration>.Instance.Armor.ArmorClass;
+        for (int i = armorClasses.Length - 1; i >= 0; i--)
+            if (armorClasses[i].Resistance <= instance.PenetrationPower)
+                return i;
+        return 0;
+    }
+
+    private static readonly HashSet<ItemAttribute> ExtraAttributes = [];
+
+    private static void AddExtraQuality(this AmmoTemplate instance, ConfigEntry<bool> setting, ItemAttribute attribute)
+    {
+        if (!setting.Value)
+            return;
+        int count = instance._cachedQualities.Count;
+        instance.SafelyAddQualityToList(attribute);
+        if (instance._cachedQualities.Count > count)
+            ExtraAttributes.Add(attribute);
     }
 
     private static string Percent(float chance) => $"{Mathf.Clamp01(chance) * 100f:F1}%";
@@ -135,33 +182,33 @@ internal static class AmmoTemplateExtensions
         Explosives.SetTooltip(instance._cachedQualities, EItemAttributeId.MaxAmmoDamage,
             () => "Direct hit only, the explosion damage is separate.");
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.MaximumThrowDamage,
+        instance.AddExtraQuality(Settings.BlastDamage, CompactAttribute.Create(EItemAttributeId.MaximumThrowDamage,
             "BlastDamage",
             () => instance.ExplosionStrength,
             () => instance.ExplosionStrength.ToString(),
             displayName: () => "Blast damage",
             tooltip: () => Explosives.BlastDamageTooltip));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.ExplosionDistance,
+        instance.AddExtraQuality(Settings.ExplosionRadius, CompactAttribute.Create(EItemAttributeId.ExplosionDistance,
             EItemAttributeId.ExplosionDistance.GetName(),
             () => instance.MaxExplosionDistance,
             () => $"{instance.MinExplosionDistance} - {instance.MaxExplosionDistance} {"meters".Localized()}"));
 
         if (instance.FuzeArmTimeSec > 0f)
-            instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.ExplosionDelay,
+            instance.AddExtraQuality(Settings.FuseArming, CompactAttribute.Create(EItemAttributeId.ExplosionDelay,
                 "FuzeArmTime",
                 () => instance.FuzeArmTimeSec,
                 () => $"{instance.FuzeArmTimeSec}s (~{instance.FuzeArmTimeSec * instance.InitialSpeed:F0}m)",
                 displayName: () => "Fuse arming"));
 
-        instance.SafelyAddQualityToList(CompactAttribute.Create(EItemAttributeId.FragmentsCount,
+        instance.AddExtraQuality(Settings.FragmentCount, CompactAttribute.Create(EItemAttributeId.FragmentsCount,
             EItemAttributeId.FragmentsCount.GetName(),
             () => instance.FragmentsCount,
             () => Explosives.FormatFragmentsCount(instance.FragmentsCount),
             tooltip: () => Explosives.FragmentsCountTooltip));
 
         foreach (ItemAttribute attribute in Explosives.CreateFragmentAttributes(instance.FragmentsCount, instance.FragmentType))
-            instance.SafelyAddQualityToList(attribute);
+            instance.AddExtraQuality(Settings.FragmentStats, attribute);
     }
 }
 

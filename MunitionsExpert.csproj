@@ -16,6 +16,9 @@
         <Reference Include="Comfort">
             <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\Comfort.dll</HintPath>
         </Reference>
+        <Reference Include="Sirenix.Serialization">
+            <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\Sirenix.Serialization.dll</HintPath>
+        </Reference>
         <Reference Include="spt-reflection">
             <HintPath>$(SPTPath)\BepInEx\plugins\spt\spt-reflection.dll</HintPath>
         </Reference>
@@ -27,6 +30,9 @@
         </Reference>
         <Reference Include="UnityEngine.ImageConversionModule">
             <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.UI">
+            <HintPath>$(SPTPath)\EscapeFromTarkov_Data\Managed\UnityEngine.UI.dll</HintPath>
         </Reference>
     </ItemGroup>
 
